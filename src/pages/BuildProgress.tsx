@@ -31,6 +31,30 @@ interface LeadData {
   notes: string | null;
 }
 
+interface GoogleBusinessData {
+  found: boolean;
+  name: string;
+  address: string;
+  city?: string;
+  state?: string;
+  phone: string;
+  website: string;
+  googleUrl: string;
+  rating: number;
+  reviewCount: number;
+  reviews: Array<{
+    author: string;
+    rating: number;
+    text: string;
+    relativeTime: string;
+    profilePhoto: string;
+  }>;
+  photos: string[];
+  hours: Record<string, string>;
+  types: string[];
+  businessType: string;
+}
+
 interface BuildStep {
   id: string;
   label: string;
@@ -39,42 +63,53 @@ interface BuildStep {
   section: string;
 }
 
-function createBuildSteps(businessName: string, businessType: string): BuildStep[] {
+function createBuildSteps(businessName: string, businessType: string, googleData: GoogleBusinessData | null): BuildStep[] {
   const typeLabel = BUSINESS_DEFAULTS[businessType as BusinessType]?.label || "business";
+  const hasData = googleData?.found === true;
 
   return [
     {
       id: "lookup",
       label: "Looking up business data",
-      thinkingText: `Searching for "${businessName}" — pulling business data, photos, and reviews from Google...`,
+      thinkingText: hasData
+        ? `Found "${googleData!.name}" at ${googleData!.address}. Retrieved ${googleData!.reviewCount} reviews (${googleData!.rating}★ average). Downloaded ${googleData!.photos.length} business photos.`
+        : `Searching for "${businessName}" — pulling business data, photos, and reviews from Google...`,
       durationMs: 3000,
       section: "none",
     },
     {
       id: "palette",
       label: "Choosing brand colors and typography",
-      thinkingText: `This is a ${typeLabel.toLowerCase()}. I'll use a color palette that matches the industry — warm and inviting with strong contrast for CTAs. Selecting fonts that feel professional but approachable.`,
+      thinkingText: hasData
+        ? `Detected: ${typeLabel}. Applying ${typeLabel.toLowerCase()} industry color palette — selecting colors that match ${googleData!.name}'s brand feel. Choosing fonts that feel professional but approachable.`
+        : `This is a ${typeLabel.toLowerCase()}. I'll use a color palette that matches the industry — warm and inviting with strong contrast for CTAs.`,
       durationMs: 2500,
       section: "none",
     },
     {
       id: "header",
       label: "Building the header and navigation",
-      thinkingText: `Creating a sticky header with the business name, navigation links, and a prominent phone number. Mobile-responsive hamburger menu included.`,
+      thinkingText: hasData
+        ? `Creating sticky header with "${googleData!.name}" branding, navigation links, and ${googleData!.phone ? `click-to-call: ${googleData!.phone}` : "contact button"}. Mobile hamburger menu included.`
+        : `Creating a sticky header with the business name, navigation links, and a prominent phone number. Mobile-responsive hamburger menu included.`,
       durationMs: 2000,
       section: "hero",
     },
     {
       id: "hero",
       label: "Building the hero section",
-      thinkingText: `Full-bleed hero with a high-quality background image, gradient overlay, headline, call-to-action buttons, and social proof stats bar. This needs to grab attention in 3 seconds.`,
+      thinkingText: hasData && googleData!.photos.length > 0
+        ? `Using real business photo as hero background. Adding gradient overlay, headline, call-to-action buttons, and ${googleData!.rating}★ rating badge from ${googleData!.reviewCount} Google reviews.`
+        : `Full-bleed hero with a high-quality background image, gradient overlay, headline, call-to-action buttons, and social proof stats bar. This needs to grab attention in 3 seconds.`,
       durationMs: 3500,
       section: "hero",
     },
     {
       id: "services",
       label: "Adding services section",
-      thinkingText: `Building a services grid with 4 key offerings for this ${typeLabel.toLowerCase()}. Each card gets an icon, title, and description. Hover effects for interactivity.`,
+      thinkingText: hasData
+        ? `Building a services grid with key offerings for this ${typeLabel.toLowerCase()}. Each card gets an icon, title, and description based on what customers mention in reviews.`
+        : `Building a services grid with 4 key offerings for this ${typeLabel.toLowerCase()}. Each card gets an icon, title, and description.`,
       durationMs: 3000,
       section: "services",
     },
@@ -88,21 +123,27 @@ function createBuildSteps(businessName: string, businessType: string): BuildStep
     {
       id: "about",
       label: "Writing the about section",
-      thinkingText: `Generating personalized about copy for ${businessName}. Adding the business story, key differentiators, and a professional interior photo. Badges for years of experience.`,
+      thinkingText: hasData
+        ? `Writing personalized about copy for ${googleData!.name}${googleData!.city ? ` in ${googleData!.city}` : ""}. Highlighting key differentiators based on ${googleData!.reviewCount} customer reviews.`
+        : `Generating personalized about copy for ${businessName}. Adding the business story, key differentiators, and a professional photo.`,
       durationMs: 2500,
       section: "about",
     },
     {
       id: "hours",
       label: "Adding hours and location",
-      thinkingText: `Setting up the hours and location section with a map placeholder, business hours display, and quick-access info cards. Phone number as a tap-to-call link on mobile.`,
+      thinkingText: hasData && Object.keys(googleData!.hours).length > 0
+        ? `Pulling real business hours from Google. ${googleData!.address}. Adding map preview and "Get Directions" link.`
+        : `Setting up the hours and location section with a map placeholder, business hours, and quick-access info cards.`,
       durationMs: 2000,
       section: "hours",
     },
     {
       id: "contact",
       label: "Building the contact section",
-      thinkingText: `Adding contact form, social media links (Facebook, Instagram, Google, Yelp), and contact info cards. Form submits to the business email.`,
+      thinkingText: hasData
+        ? `Adding contact form${googleData!.phone ? `, phone: ${googleData!.phone}` : ""}${googleData!.website ? `, website link` : ""}. Social media links and contact info cards.`
+        : `Adding contact form, social media links, and contact info cards.`,
       durationMs: 2500,
       section: "contact",
     },
@@ -131,6 +172,7 @@ const BuildProgress = () => {
   const navigate = useNavigate();
 
   const [lead, setLead] = useState<LeadData | null>(null);
+  const [googleData, setGoogleData] = useState<GoogleBusinessData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -141,6 +183,7 @@ const BuildProgress = () => {
   const stepsRef = useRef<BuildStep[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
 
+  // Load lead + Google business data from sessionStorage
   useEffect(() => {
     if (!id) return;
     const fetchLead = async () => {
@@ -154,13 +197,31 @@ const BuildProgress = () => {
         setLoadError("Lead not found");
       } else {
         setLead(data as LeadData);
-        stepsRef.current = createBuildSteps(data.business_name, data.business_type);
+
+        // Parse Google data from sessionStorage
+        let parsedGoogleData: GoogleBusinessData | null = null;
+        try {
+          const stored = sessionStorage.getItem(`businessData_${id}`);
+          if (stored) {
+            parsedGoogleData = JSON.parse(stored);
+            setGoogleData(parsedGoogleData);
+          }
+        } catch (e) {
+          console.error("Failed to parse business data from sessionStorage:", e);
+        }
+
+        stepsRef.current = createBuildSteps(
+          data.business_name,
+          data.business_type,
+          parsedGoogleData
+        );
         setCurrentStepIndex(0);
       }
     };
     fetchLead();
   }, [id]);
 
+  // Step progression timer
   useEffect(() => {
     if (currentStepIndex < 0) return;
     const steps = stepsRef.current;
@@ -187,6 +248,7 @@ const BuildProgress = () => {
     };
   }, [currentStepIndex]);
 
+  // Auto-scroll build log
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -225,6 +287,16 @@ const BuildProgress = () => {
     BUSINESS_DEFAULTS[lead.business_type] || BUSINESS_DEFAULTS.general_service;
   const primaryColor = defaults.primaryColor;
 
+  // Use real Google data for preview, falling back to defaults
+  const heroImage = googleData?.photos?.[0] || defaults.heroImage;
+  const realHours = googleData?.hours && Object.keys(googleData.hours).length > 0
+    ? JSON.stringify(googleData.hours)
+    : lead.hours || undefined;
+  const realPhone = googleData?.phone || lead.phone || undefined;
+  const realAddress = googleData?.address || lead.address;
+  const realGoogleUrl = googleData?.googleUrl || lead.google_url || undefined;
+  const realName = googleData?.name || lead.business_name;
+
   return (
     <>
       <style>{`
@@ -242,7 +314,7 @@ const BuildProgress = () => {
               <Sparkles className="w-5 h-5 text-indigo-400" />
               <span className="text-white font-semibold">Building Website</span>
             </div>
-            <p className="text-slate-400 text-sm truncate">{lead.business_name}</p>
+            <p className="text-slate-400 text-sm truncate">{realName}</p>
           </div>
 
           {/* Steps log */}
@@ -363,7 +435,7 @@ const BuildProgress = () => {
               <div className="w-3 h-3 rounded-full bg-green-400" />
             </div>
             <div className="flex-1 bg-white rounded-md px-3 py-1 text-xs text-slate-400 font-mono truncate">
-              {lead.business_name.toLowerCase().replace(/\s+/g, "")}.com
+              {realName.toLowerCase().replace(/\s+/g, "")}.com
             </div>
           </div>
 
@@ -381,11 +453,12 @@ const BuildProgress = () => {
             {visibleSections.has("hero") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewHero
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
-                  phone={lead.phone || undefined}
-                  address={lead.address}
+                  phone={realPhone}
+                  address={realAddress}
                   primaryColor={primaryColor}
+                  heroImage={heroImage}
                 />
               </div>
             )}
@@ -393,7 +466,7 @@ const BuildProgress = () => {
             {visibleSections.has("services") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewServices
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
                   primaryColor={primaryColor}
                 />
@@ -403,7 +476,7 @@ const BuildProgress = () => {
             {visibleSections.has("booking") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewBooking
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
                   primaryColor={primaryColor}
                 />
@@ -413,9 +486,9 @@ const BuildProgress = () => {
             {visibleSections.has("about") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewAbout
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
-                  address={lead.address}
+                  address={realAddress}
                   primaryColor={primaryColor}
                 />
               </div>
@@ -424,13 +497,13 @@ const BuildProgress = () => {
             {visibleSections.has("hours") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewHours
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
-                  address={lead.address}
-                  phone={lead.phone || undefined}
-                  hours={lead.hours || undefined}
+                  address={realAddress}
+                  phone={realPhone}
+                  hours={realHours}
                   primaryColor={primaryColor}
-                  googleUrl={lead.google_url || undefined}
+                  googleUrl={realGoogleUrl}
                 />
               </div>
             )}
@@ -438,11 +511,11 @@ const BuildProgress = () => {
             {visibleSections.has("contact") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewContact
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
-                  phone={lead.phone || undefined}
+                  phone={realPhone}
                   email={lead.email || undefined}
-                  address={lead.address}
+                  address={realAddress}
                   primaryColor={primaryColor}
                 />
               </div>
@@ -451,11 +524,11 @@ const BuildProgress = () => {
             {visibleSections.has("footer") && (
               <div style={{ animation: "fadeIn 0.6s ease-out" }}>
                 <PreviewFooter
-                  businessName={lead.business_name}
+                  businessName={realName}
                   businessType={lead.business_type}
-                  phone={lead.phone || undefined}
-                  address={lead.address}
-                  hours={lead.hours || undefined}
+                  phone={realPhone}
+                  address={realAddress}
+                  hours={realHours}
                   primaryColor={primaryColor}
                 />
               </div>

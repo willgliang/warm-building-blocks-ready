@@ -7,6 +7,7 @@ interface PreviewHeroProps {
   phone?: string;
   address: string;
   primaryColor: string;
+  heroImage?: string;
 }
 
 const PreviewHero = ({
@@ -15,15 +16,17 @@ const PreviewHero = ({
   phone,
   address,
   primaryColor,
+  heroImage,
 }: PreviewHeroProps) => {
   const defaults = BUSINESS_DEFAULTS[businessType];
   const city = address.split(",")[0] || "Local Area";
+  const backgroundImage = heroImage || defaults.heroImage;
 
   return (
     <div
       className="relative w-full h-screen flex flex-col items-center justify-center text-center text-white overflow-hidden"
       style={{
-        backgroundImage: `url('${defaults.heroImage}')`,
+        backgroundImage: `url('${backgroundImage}')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
