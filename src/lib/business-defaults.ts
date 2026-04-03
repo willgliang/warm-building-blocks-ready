@@ -9,6 +9,7 @@ export type BusinessType =
   | "restaurant"
   | "cafe"
   | "auto_repair"
+  | "car_wash"
   | "gym"
   | "cleaning_service"
   | "dental_office"
@@ -152,6 +153,30 @@ export const BUSINESS_DEFAULTS: Record<BusinessType, BusinessDefaults> = {
       { value: "ASE", label: "Certified Tech" },
       { value: "Same-Day", label: "Most Repairs" },
       { value: "Free", label: "Estimates" },
+    ],
+  },
+
+  car_wash: {
+    icon: Droplets,
+    label: "Car Wash",
+    tagline: "Drive Clean. Shine Bright. Every Time.",
+    aboutTemplate:
+      "{name} keeps {city} vehicles looking their best. From express washes to full detail — drive in dirty, drive out sparkling.",
+    primaryColor: "#0a2540",
+    accentColor: "#00b4d8",
+    heroImage:
+      "https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?w=1600&q=80&fit=crop",
+    services: [
+      { name: "Express Wash", description: "Quick exterior wash — in and out in minutes." },
+      { name: "Full Service Wash", description: "Inside and out. Vacuum, wipe-down, and hand dry." },
+      { name: "Premium Detail", description: "Deep clean, wax, tire shine, and interior shampoo." },
+      { name: "Unlimited Wash Plans", description: "Monthly memberships for unlimited washes." },
+    ],
+    socialPlatforms: ["facebook", "instagram", "google", "yelp"],
+    stats: [
+      { value: "5min", label: "Express Wash" },
+      { value: "Eco", label: "Friendly" },
+      { value: "Open", label: "7 Days" },
     ],
   },
 

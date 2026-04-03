@@ -13,7 +13,7 @@ const PreviewAbout = ({
   address,
   primaryColor,
 }: PreviewAboutProps) => {
-  const defaults = BUSINESS_DEFAULTS[businessType];
+  const defaults = BUSINESS_DEFAULTS[businessType] || BUSINESS_DEFAULTS.general_service;
   const city = extractCity(address);
   const aboutText = generateAbout(defaults.aboutTemplate, businessName, city);
 

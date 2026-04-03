@@ -12,7 +12,7 @@ const PreviewBooking = ({
   businessType,
   primaryColor,
 }: PreviewBookingProps) => {
-  const defaults = BUSINESS_DEFAULTS[businessType];
+  const defaults = BUSINESS_DEFAULTS[businessType] || BUSINESS_DEFAULTS.general_service;
 
   return (
     <section className="py-16 md:py-24 px-6 bg-gray-50" id="booking">

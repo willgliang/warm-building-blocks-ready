@@ -18,8 +18,8 @@ const PreviewHero = ({
   primaryColor,
   heroImage,
 }: PreviewHeroProps) => {
-  const defaults = BUSINESS_DEFAULTS[businessType];
-  const city = address.split(",")[0] || "Local Area";
+  const defaults = BUSINESS_DEFAULTS[businessType] || BUSINESS_DEFAULTS.general_service;
+  const city = address?.split(",")[0] || "Local Area";
   const backgroundImage = heroImage || defaults.heroImage;
 
   return (

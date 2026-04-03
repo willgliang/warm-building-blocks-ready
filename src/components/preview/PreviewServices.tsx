@@ -11,7 +11,7 @@ const PreviewServices = ({
   businessType,
   primaryColor,
 }: PreviewServicesProps) => {
-  const defaults = BUSINESS_DEFAULTS[businessType];
+  const defaults = BUSINESS_DEFAULTS[businessType] || BUSINESS_DEFAULTS.general_service;
 
   return (
     <section className="py-16 md:py-24 px-6 bg-white" id="services">

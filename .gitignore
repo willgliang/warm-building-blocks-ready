@@ -5,3 +5,9 @@ dist-ssr
 .env
 .env.local
 .DS_Store
+
+# Ignore stale JS/JSX compiled files that shadow TS/TSX sources
+# (Lovable generates these locally; they break Vite resolution order)
+src/**/*.js
+src/**/*.jsx
+!src/vite-env.d.ts

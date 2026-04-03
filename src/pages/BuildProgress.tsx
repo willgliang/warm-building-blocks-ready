@@ -287,8 +287,13 @@ const BuildProgress = () => {
     BUSINESS_DEFAULTS[lead.business_type] || BUSINESS_DEFAULTS.general_service;
   const primaryColor = defaults.primaryColor;
 
-  // Use real Google data for preview, falling back to defaults
-  const heroImage = googleData?.photos?.[0] || defaults.heroImage;
+  // Use curated stock hero for known business types (more visually compelling than random Google photos).
+  // Google photos go to about/gallery sections. Fall back to Google photo[0] only for general_service.
+  const businessType = lead.business_type as string;
+  const hasKnownType = businessType && businessType !== "general_service";
+  const heroImage = hasKnownType
+    ? defaults.heroImage
+    : (googleData?.photos?.[0] || defaults.heroImage);
   const realHours = googleData?.hours && Object.keys(googleData.hours).length > 0
     ? JSON.stringify(googleData.hours)
     : lead.hours || undefined;

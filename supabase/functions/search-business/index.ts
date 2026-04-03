@@ -15,7 +15,7 @@ function mapBusinessType(types: string[]): string {
     cafe: "cafe",
     bakery: "cafe",
     car_repair: "auto_repair",
-    car_wash: "auto_repair",
+    car_wash: "car_wash",
     gym: "gym",
     dentist: "dental_office",
     real_estate_agency: "real_estate",
@@ -30,17 +30,13 @@ function mapBusinessType(types: string[]): string {
 
 // Extract Place ID from various Google Maps URL formats
 function extractPlaceId(url: string): string | null {
-  // Format: /place/.../.../data=...!1s<placeId>
-  const dataMatch = url.match(/!1s(0x[a-f0-9]+:0x[a-f0-9]+)/)
-  if (dataMatch) return dataMatch[1]
-
-  // Format: ?cid=<number>
-  const cidMatch = url.match(/cid=(\d+)/)
-  if (cidMatch) return null // CID is NOT a Place ID, skip it
-
-  // Format: place_id=<id>
+  // Format: place_id=<id> (most reliable — real Place IDs start with ChIJ)
   const pidMatch = url.match(/place_id=([A-Za-z0-9_-]+)/)
   if (pidMatch) return pidMatch[1]
+
+  // NOTE: Hex CIDs like 0x88f5909c:0x41f6fe79 are NOT Place IDs.
+  // The !1s... format in Google Maps URLs contains CIDs, not Place IDs.
+  // We skip those and fall back to text search instead.
 
   return null
 }
@@ -65,6 +61,12 @@ async function findPlace(query: string, apiKey: string): Promise<string | null> 
   console.log(`[search-business] Finding place: "${query}"`)
   const response = await fetch(url)
   const data = await response.json()
+
+  // Surface Google API errors instead of silently returning null
+  if (data.status && data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    console.error(`[search-business] Google Find Place API error: ${data.status} - ${data.error_message || "no details"}`)
+    throw new Error(`Google Places API: ${data.status}${data.error_message ? ` - ${data.error_message}` : ""}`)
+  }
 
   if (data.candidates && data.candidates.length > 0) {
     console.log(`[search-business] Found place_id: ${data.candidates[0].place_id}`)
