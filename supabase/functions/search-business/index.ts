@@ -6,25 +6,114 @@ const corsHeaders = {
 }
 
 // Map Google Place types to our business categories
-function mapBusinessType(types: string[]): string {
+// Full list: https://developers.google.com/maps/documentation/places/web-service/supported_types
+function mapBusinessType(types: string[], description?: string): string {
   const typeMap: Record<string, string> = {
+    // Beauty & personal care
     hair_care: "hair_salon",
     beauty_salon: "hair_salon",
     barber: "barber_shop",
+    nail_salon: "nail_salon",
+    spa: "spa",
+
+    // Food & drink
     restaurant: "restaurant",
     cafe: "cafe",
     bakery: "cafe",
+    bar: "restaurant",
+    meal_delivery: "restaurant",
+    meal_takeaway: "restaurant",
+
+    // Automotive
     car_repair: "auto_repair",
     car_wash: "car_wash",
-    gym: "gym",
+    car_dealer: "auto_repair",
+
+    // Health & medical
     dentist: "dental_office",
+    veterinary_care: "veterinarian",
+    pharmacy: "pharmacy",
+    doctor: "general_service",
+    hospital: "general_service",
+    physiotherapist: "general_service",
+
+    // Fitness
+    gym: "gym",
+
+    // Home services
+    general_contractor: "contractor",
+    home_improvement_store: "contractor",
+    plumber: "plumber",
+    electrician: "electrician",
+    roofing_contractor: "roofing",
+    painter: "painting",
+    moving_company: "moving_company",
+    laundry: "dry_cleaner",
+    locksmith: "general_service",
+
+    // Professional services
     real_estate_agency: "real_estate",
-    laundry: "cleaning_service",
-    moving_company: "cleaning_service",
+    lawyer: "lawyer",
+    accounting: "accountant",
+    insurance_agency: "insurance",
+
+    // Pets
+    pet_store: "pet_groomer",
+
+    // Shopping & misc
+    florist: "florist",
+
+    // Pest control (Google doesn't have a specific type — matched by description)
+    pest_control: "pest_control",
   }
+
+  // First: try matching Google types
   for (const t of types) {
     if (typeMap[t]) return typeMap[t]
   }
+
+  // Second: if Google didn't give a useful type, try matching the description
+  if (description) {
+    const desc = description.toLowerCase()
+    const descriptionMap: [string[], string][] = [
+      [["deck", "patio", "fence", "remodel", "renovation", "addition", "construction", "builder", "contractor", "handyman"], "contractor"],
+      [["plumb", "pipe", "drain", "water heater", "sewer"], "plumber"],
+      [["electric", "wiring", "panel", "outlet", "lighting"], "electrician"],
+      [["hvac", "heating", "cooling", "air condition", "furnace", "heat pump"], "hvac"],
+      [["roof", "gutter", "shingle"], "roofing"],
+      [["paint", "painting", "stain", "drywall"], "painting"],
+      [["pest", "termite", "exterminator", "rodent", "bug"], "pest_control"],
+      [["tattoo", "piercing", "body art", "ink"], "tattoo_shop"],
+      [["groom", "dog groom", "pet groom", "pet spa"], "pet_groomer"],
+      [["vet", "animal hospital", "animal clinic"], "veterinarian"],
+      [["photo", "portrait", "wedding photo", "headshot"], "photographer"],
+      [["flower", "floral", "florist", "bouquet"], "florist"],
+      [["nail", "manicure", "pedicure", "gel nail"], "nail_salon"],
+      [["spa", "massage", "facial", "wellness"], "spa"],
+      [["law", "attorney", "legal"], "lawyer"],
+      [["account", "tax", "bookkeep", "cpa"], "accountant"],
+      [["insur", "coverage", "policy"], "insurance"],
+      [["dry clean", "laundry", "press", "alteration"], "dry_cleaner"],
+      [["pharmacy", "prescription", "drug store"], "pharmacy"],
+      [["mov", "hauling", "relocation"], "moving_company"],
+      [["clean", "maid", "janitorial"], "cleaning_service"],
+      [["lawn", "landscape", "mow", "tree service", "yard"], "landscaping"],
+      [["barber", "fade", "men's hair"], "barber_shop"],
+      [["salon", "hair", "stylist", "color", "blowout"], "hair_salon"],
+      [["car wash", "detail", "auto detail"], "car_wash"],
+      [["mechanic", "auto repair", "brake", "oil change", "transmission"], "auto_repair"],
+      [["gym", "fitness", "crossfit", "personal train", "yoga"], "gym"],
+      [["dent", "orthodont", "oral"], "dental_office"],
+      [["real estate", "realtor", "broker", "property"], "real_estate"],
+      [["restaurant", "grill", "bistro", "diner", "kitchen"], "restaurant"],
+      [["coffee", "cafe", "espresso", "tea house"], "cafe"],
+    ]
+
+    for (const [keywords, type] of descriptionMap) {
+      if (keywords.some(kw => desc.includes(kw))) return type
+    }
+  }
+
   return "general_service"
 }
 
@@ -136,7 +225,7 @@ function parseHours(openingHours: any): Record<string, string> {
   } else {
     // Fallback if no hours data
     for (const day of days) {
-      hours[day] = day === "Sunday" ? "10:00 AM – 6:00 PM" : "9:00 AM – 7:00 PM"
+      hours[day] = day === "Sunday" ? "Closed" : "9:00 AM – 5:00 PM"
     }
   }
 
@@ -159,7 +248,7 @@ serve(async (req) => {
   }
 
   try {
-    const { businessName, googleUrl } = await req.json()
+    const { businessName, description, googleUrl } = await req.json()
 
     if (!businessName) {
       return new Response(
@@ -196,14 +285,22 @@ serve(async (req) => {
       }
     }
 
-    // Fallback: search by business name
+    // Fallback: search by business name + description for better disambiguation
     if (!placeId) {
-      placeId = await findPlace(businessName, apiKey)
+      // Try name + description first (e.g. "T&T deck builder" instead of just "T&T")
+      if (description) {
+        placeId = await findPlace(`${businessName} ${description}`, apiKey)
+      }
+      // If that didn't work, try just the name
+      if (!placeId) {
+        placeId = await findPlace(businessName, apiKey)
+      }
     }
 
     if (!placeId) {
       console.log(`[search-business] Could not find place for: "${businessName}"`)
-      // Return minimal response with no Google data
+      // Return minimal response — use description to pick the best business type
+      const businessType = mapBusinessType([], description)
       return new Response(
         JSON.stringify({
           found: false,
@@ -218,7 +315,7 @@ serve(async (req) => {
           photos: [],
           hours: {},
           types: [],
-          businessType: "general_service",
+          businessType,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
@@ -248,7 +345,8 @@ serve(async (req) => {
       }))
 
     // --- STEP 6: Determine business type ---
-    const businessType = mapBusinessType(place.types || [])
+    // Pass both Google types AND user description for best match
+    const businessType = mapBusinessType(place.types || [], description)
 
     // --- Build response ---
     const responseData = {

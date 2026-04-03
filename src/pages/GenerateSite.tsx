@@ -21,6 +21,7 @@ export default function GenerateSite() {
       const { data: businessData, error: fnError } = await supabase.functions.invoke('search-business', {
         body: JSON.stringify({
           businessName: name,
+          description: desc || undefined,
           googleUrl: url || undefined,
         })
       });
